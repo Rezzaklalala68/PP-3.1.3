@@ -45,12 +45,18 @@ public class AdminController {
     }
 
     @PostMapping("/users")
-    public String addUser(@ModelAttribute User user, Model model) {
-        if (userService.findUserAndFetchRoles(user.getEmail()).isPresent()) {
-            model.addAttribute("errorMessage", "Username уже используется!");
+    public String addUser(@ModelAttribute User user,  Model model) {
+        // Проверяем, используется ли email другим пользователем
+        Optional<User> userWithSameEmail = userService.findUserAndFetchRoles(user.getEmail());
+        if (userWithSameEmail.isPresent() && !userWithSameEmail.get().getId().equals(user.getId())) {
+            model.addAttribute("users", userService.findAll());
+            model.addAttribute("allRoles", roleService.findAll());
+            model.addAttribute("errorMessage", "Email уже используется!");
             model.addAttribute("user", user);
             return "admin";
         }
+
+
         userService.add(user);
         return "redirect:/admin";
     }
@@ -65,20 +71,25 @@ public class AdminController {
 
     @PutMapping("/users/{id}")
     public String updateUser(@ModelAttribute User user, @PathVariable Long id, Model model) {
-        Optional<User> existingUser = userService.findById(id);
-        if (existingUser.isPresent()) {
-            User currentUser = existingUser.get();
-            if (!currentUser.getEmail().equals(user.getEmail()) && userService.findUserAndFetchRoles(user.getEmail()).isPresent()) {
+            // Проверяем, используется ли email другим пользователем
+            Optional<User> userWithSameEmail = userService.findUserAndFetchRoles(user.getEmail());
+            if (userWithSameEmail.isPresent() && !userWithSameEmail.get().getId().equals(id)) {
+                model.addAttribute("users", userService.findAll());
+                model.addAttribute("allRoles", roleService.findAll());
                 model.addAttribute("errorMessage", "Email уже используется!");
                 model.addAttribute("user", user);
                 return "admin";
             }
-            user.setId(id);
+
+
+            // Обновляем пароль только если он был передан
+            if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+                user.setPassword(user.getPassword());
+            }
+
+            // Сохраняем обновленного пользователя
             userService.update(user);
             return "redirect:/admin";
-        } else {
-            model.addAttribute("errorMessage", "Пользователь не найден!");
-            return "admin";
-        }
+
     }
 }
